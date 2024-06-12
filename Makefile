@@ -219,22 +219,6 @@ UPROGS += \
 	$U/_cowtest
 endif
 
-ifeq ($(LAB),traps)
-UPROGS += \
-	$U/_call\
-	$U/_bttest
-endif
-
-ifeq ($(LAB),lazy)
-UPROGS += \
-	$U/_lazytests
-endif
-
-ifeq ($(LAB),cow)
-UPROGS += \
-	$U/_cowtest
-endif
-
 ifeq ($(LAB),thread)
 UPROGS += \
 	$U/_uthread
