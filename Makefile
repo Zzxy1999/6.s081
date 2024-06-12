@@ -219,6 +219,30 @@ UPROGS += \
 	$U/_cowtest
 endif
 
+
+
+
+ifeq ($(LAB),$(filter $(LAB), lock))
+UPROGS += \
+	$U/_stats
+endif
+
+ifeq ($(LAB),traps)
+UPROGS += \
+	$U/_call\
+	$U/_bttest
+endif
+
+ifeq ($(LAB),lazy)
+UPROGS += \
+	$U/_lazytests
+endif
+
+ifeq ($(LAB),cow)
+UPROGS += \
+	$U/_cowtest
+endif
+
 ifeq ($(LAB),thread)
 UPROGS += \
 	$U/_uthread
