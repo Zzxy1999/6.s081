@@ -26,6 +26,14 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+// set mask for sys_trace
+void set_mask(int m) {
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  p->mask = m;
+  release(&p->lock);
+}
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -237,6 +245,10 @@ userinit(void)
   p = allocproc();
   initproc = p;
   
+  // mask set 0
+  p->mask = 0;
+  // p->mask = ~0; // ffffffff
+
   // allocate one user page and copy initcode's instructions
   // and data into it.
   uvmfirst(p->pagetable, initcode, sizeof(initcode));
@@ -250,7 +262,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
-
+  
   release(&p->lock);
 }
 
@@ -287,6 +299,9 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
+
+  // set mask
+  np->mask = p->mask;
 
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
