@@ -26,6 +26,21 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+// 遍历proc，计数UNUSED
+uint64 nproc_count() {
+  uint64 nproc_cnt = 0;
+  struct proc* p = proc;
+  while (p < &proc[NPROC]) {
+    acquire(&p->lock);
+    if (p->state != UNUSED) {
+      ++nproc_cnt;
+    }
+    release(&p->lock);
+    ++p;
+  }
+  return nproc_cnt;
+}
+
 // set mask for sys_trace
 void set_mask(int m) {
   struct proc *p = myproc();

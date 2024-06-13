@@ -23,6 +23,17 @@ struct {
   struct run *freelist;
 } kmem;
 
+/* 根据空页算出空闲内存 */
+uint64 freemem_count() {
+  uint64 page_cnt = 0;
+  struct run *p = kmem.freelist;
+  while (p) {
+    ++page_cnt;
+    p = p->next;
+  }
+  return page_cnt * PGSIZE;
+}
+
 void
 kinit()
 {

@@ -5,9 +5,19 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
 
+// 调用两个count得到sysinfo，再copyout即可
 uint64 sys_sysinfo(void) {
-  printf("sys_info\n");
+  struct sysinfo sinfo;
+  sinfo.freemem = freemem_count();
+  sinfo.nproc = nproc_count();
+  uint64 sinfo_addr;
+  argaddr(0, &sinfo_addr);
+  struct proc *p = myproc();
+  if (copyout(p->pagetable, sinfo_addr, (char *)(&sinfo), sizeof(sinfo)) < 0) {
+    return -1;
+  }
   return 0;
 }
 
