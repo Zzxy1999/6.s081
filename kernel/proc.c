@@ -177,6 +177,7 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+  p->us = 0;
   p->state = UNUSED;
 }
 
@@ -213,7 +214,7 @@ proc_pagetable(struct proc *p)
 
   // map pid
   if(mappages(pagetable, USYSCALL, PGSIZE,
-              (uint64)(p->us), PTE_U) < 0) {
+              (uint64)(p->us), PTE_U | PTE_R) < 0) {
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);
     uvmunmap(pagetable, TRAPFRAME, 1, 0);
     uvmfree(pagetable, 0);
@@ -230,6 +231,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, USYSCALL, 1, 0);
   uvmfree(pagetable, sz);
 }
 
@@ -251,7 +253,7 @@ void
 userinit(void)
 {
   struct proc *p;
-
+  
   p = allocproc();
   initproc = p;
   
@@ -305,7 +307,7 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
-
+  
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -325,13 +327,13 @@ fork(void)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
-
+  
   safestrcpy(np->name, p->name, sizeof(p->name));
-
+  
   pid = np->pid;
 
   release(&np->lock);
-
+  
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);

@@ -438,14 +438,14 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-void vmprint(pagetable_t pagetable) {
-  printf("page table %p\n", pagetable);
-  for(int i = 0; i < 512; i++) {
-    pte_t pte = pagetable[i];
+// void vmprint(pagetable_t pagetable) {
+//   printf("page table %p\n", pagetable);
+//   for(int i = 0; i < 512; i++) {
+//     pte_t pte = pagetable[i];
 
-  }
-}
+//   }
+// }
 
-void printpte(pte_t pte) {
+// void printpte(pte_t pte) {
   
-}
+// }
