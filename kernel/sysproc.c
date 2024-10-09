@@ -74,6 +74,31 @@ sys_sleep(void)
 int
 sys_pgaccess(void)
 {
+  uint64 va;
+  int cnt;
+  uint64 dst;
+
+  argaddr(0, &va);
+  argint(1, &cnt);
+  argaddr(2, &dst);
+
+  if (cnt > 32) {
+    panic("pgaccess too many pages");
+  }
+
+  uint32 b = 0;
+  pagetable_t pgt = myproc()->pagetable;
+
+  for (int i = 0; i < cnt; i++) {
+    pte_t *pte = walk(pgt, va + i * PGSIZE, 0);
+    if (*pte & PTE_A) {
+      b = b | (1UL << i);
+      *pte = *pte & (~PTE_A);
+    }
+  }
+
+  copyout(pgt, dst, (char *)(&b), sizeof(uint32));
+  // vmprint(myproc()->pagetable);
   // lab pgtbl: your code here.
   return 0;
 }
