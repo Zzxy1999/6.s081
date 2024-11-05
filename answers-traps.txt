@@ -1,0 +1,8 @@
+a2 holds 13
+inline func
+printf located at 0x630
+0x38
+He110 World
+if big-endian set i 0x726c6400
+57616dont need to change
+depend on register of param2 in printf
