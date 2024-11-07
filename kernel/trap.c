@@ -11,6 +11,8 @@ uint ticks;
 
 extern char trampoline[], uservec[], userret[];
 
+extern int pa_ref[];
+
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
 
@@ -50,7 +52,38 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
-  if(r_scause() == 8){
+  // store page fault
+  if (r_scause() == 15) {
+    // stval is vm
+    uint64 vm = r_stval();
+    pte_t* pte;
+    if ((pte = walk(p->pagetable, vm, 0)) == 0) {
+      exit(-1);
+    }
+    if ((*pte & PTE_C) == 0) {
+      exit(-1);
+    }
+    uint64 pa = PTE2PA(*pte);
+    int ref_cnt = pa_ref[PA2INDEX(pa)];
+    if (ref_cnt == 1) {
+      *pte = (*pte & (~PTE_C)) | PTE_W;
+    } else if (ref_cnt > 1) {
+      uint perm = (PTE_FLAGS(*pte) & (~PTE_C)) | PTE_W;
+      char *mem;
+      if ((mem = kalloc()) == 0) {
+        exit(-1);
+      }
+      memmove(mem, (char *)pa, PGSIZE);
+      uvmunmap(p->pagetable, PGROUNDDOWN(vm), 1, 1);
+      if(mappages(p->pagetable, PGROUNDDOWN(vm), PGSIZE, (uint64)mem, perm) != 0) {
+        kfree(mem);
+        exit(-1);
+      }
+    } else {
+      exit(-1);
+    }
+
+  } else if(r_scause() == 8){
     // system call
 
     if(killed(p))
