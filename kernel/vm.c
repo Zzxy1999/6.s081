@@ -373,14 +373,14 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
   while(len > 0){
+    if (cowcheck(pagetable, dstva) != 0) {
+      return -1;
+    }
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
     n = PGSIZE - (dstva - va0);
-    if (cowcheck(pagetable, va0) != 0) {
-      exit(-1);
-    }
     if(n > len)
       n = len;
     memmove((void *)(pa0 + (dstva - va0)), src, n);
@@ -397,8 +397,15 @@ int cowcheck(pagetable_t pagetable, uint64 vm) {
   if ((pte = walk(pagetable, vm, 0)) == 0) {
     return -1;
   }
+  if ((*pte & PTE_U) == 0 || (*pte & PTE_V) == 0) {
+    return -1;
+  }
   if ((*pte & PTE_C) == 0) {
-    return 0;
+    if ((*pte & PTE_W) != 0) {
+      return 0;
+    } else {
+      return -1;
+    }
   }
   uint64 pa = PTE2PA(*pte);
   int ref_cnt = pa_ref[PA2INDEX(pa)];

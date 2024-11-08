@@ -82,7 +82,6 @@ usertrap(void)
     } else {
       exit(-1);
     }
-
   } else if(r_scause() == 8){
     // system call
 
