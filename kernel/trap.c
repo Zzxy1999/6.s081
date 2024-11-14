@@ -11,8 +11,6 @@ uint ticks;
 
 extern char trampoline[], uservec[], userret[];
 
-extern int pa_ref[];
-
 // in kernelvec.S, calls kerneltrap().
 void kernelvec();
 
@@ -56,6 +54,9 @@ usertrap(void)
   if (r_scause() == 15) {
     // stval is vm
     uint64 vm = r_stval();
+    if (vm >= MAXVA) {
+      exit(-1);
+    }
     pte_t* pte;
     if ((pte = walk(p->pagetable, vm, 0)) == 0) {
       exit(-1);
@@ -64,10 +65,10 @@ usertrap(void)
       exit(-1);
     }
     uint64 pa = PTE2PA(*pte);
-    int ref_cnt = pa_ref[PA2INDEX(pa)];
-    if (ref_cnt == 1) {
+    int cnt = pr_get(pa);
+    if (cnt) {
       *pte = (*pte & (~PTE_C)) | PTE_W;
-    } else if (ref_cnt > 1) {
+    } else if (cnt > 1) {
       uint perm = (PTE_FLAGS(*pte) & (~PTE_C)) | PTE_W;
       char *mem;
       if ((mem = kalloc()) == 0) {
@@ -82,6 +83,7 @@ usertrap(void)
     } else {
       exit(-1);
     }
+
   } else if(r_scause() == 8){
     // system call
 

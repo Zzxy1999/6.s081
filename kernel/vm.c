@@ -15,8 +15,6 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
-extern int pa_ref[];
-
 // Make a direct-map page table for the kernel.
 pagetable_t
 kvmmake(void)
@@ -327,7 +325,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if (mappages(new, i, PGSIZE, pa, PTE_FLAGS(*pte)) != 0) {
       goto err;
     }
-    pa_ref[PA2INDEX(pa)]++;
+    pr_incr(pa);
   }
 
   // for(i = 0; i < sz; i += PGSIZE){
@@ -373,6 +371,9 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 {
   uint64 n, va0, pa0;
   while(len > 0){
+    if (dstva >= MAXVA) {
+      return -1;
+    }
     if (cowcheck(pagetable, dstva) != 0) {
       return -1;
     }
@@ -408,10 +409,10 @@ int cowcheck(pagetable_t pagetable, uint64 vm) {
     }
   }
   uint64 pa = PTE2PA(*pte);
-  int ref_cnt = pa_ref[PA2INDEX(pa)];
-  if (ref_cnt == 1) {
+  int cnt = pr_get(pa);
+  if (cnt == 1) {
     *pte = (*pte & (~PTE_C)) | PTE_W;
-  } else if (ref_cnt > 1) {
+  } else if (cnt > 1) {
     uint perm = (PTE_FLAGS(*pte) & (~PTE_C)) | PTE_W;
     char *mem;
     if ((mem = kalloc()) == 0) {
