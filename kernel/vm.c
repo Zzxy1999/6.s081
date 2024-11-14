@@ -325,7 +325,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if (mappages(new, i, PGSIZE, pa, PTE_FLAGS(*pte)) != 0) {
       goto err;
     }
-    pr_incr(pa);
+    princr(pa);
   }
 
   // for(i = 0; i < sz; i += PGSIZE){
@@ -398,7 +398,7 @@ int cowcheck(pagetable_t pagetable, uint64 vm) {
   if ((pte = walk(pagetable, vm, 0)) == 0) {
     return -1;
   }
-  if ((*pte & PTE_U) == 0 || (*pte & PTE_V) == 0) {
+  if ((*pte & PTE_V) == 0) {
     return -1;
   }
   if ((*pte & PTE_C) == 0) {
@@ -409,10 +409,9 @@ int cowcheck(pagetable_t pagetable, uint64 vm) {
     }
   }
   uint64 pa = PTE2PA(*pte);
-  int cnt = pr_get(pa);
-  if (cnt == 1) {
+  if (prget(pa) == 1) {
     *pte = (*pte & (~PTE_C)) | PTE_W;
-  } else if (cnt > 1) {
+  } else if (prget(pa) > 1) {
     uint perm = (PTE_FLAGS(*pte) & (~PTE_C)) | PTE_W;
     char *mem;
     if ((mem = kalloc()) == 0) {
@@ -426,6 +425,7 @@ int cowcheck(pagetable_t pagetable, uint64 vm) {
     }
   } else {
     return -1;
+    panic("paref cnt < 0");
   }
   return 0;
 }

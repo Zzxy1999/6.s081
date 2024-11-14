@@ -15,9 +15,9 @@ extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
 struct {
-  int cnt;
+  int cnt[(PHYSTOP - KERNBASE) / PGSIZE];
   struct spinlock lock;
-} paref[(PHYSTOP - KERNBASE) / PGSIZE];
+} paref;
 
 struct run {
   struct run *next;
@@ -32,6 +32,7 @@ void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  initlock(&paref.lock, "paref");
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -40,8 +41,9 @@ freerange(void *pa_start, void *pa_end)
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE) {
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by pa,
@@ -51,7 +53,8 @@ freerange(void *pa_start, void *pa_end)
 void
 kfree(void *pa)
 {
-  if (pr_decr((uint64)pa) > 0) {
+  int n = prdecr((uint64)pa);
+  if (n > 0) {
     return;
   }
   struct run *r;
@@ -86,41 +89,40 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
-  pr_set((uint64)r, 1);
+  prset((uint64)r, 1);
   return (void*)r;
 }
 
-void 
-pr_set(uint64 pa, int n) {
-  int i = PA2INDEX(pa);
-  //acquire(&paref[i].lock);
-  paref[i].cnt = n;
-  //release(&paref[i].lock);
+void prlock() {
+  acquire(&paref.lock);
 }
 
-int
-pr_get(uint64 pa) {
-  int i = PA2INDEX(pa);
-  //acquire(&paref[i].lock);
-  int n = paref[i].cnt;
-  //release(&paref[i].lock);
+void prunlock() {
+  release(&paref.lock);
+}
+
+inline int prget(uint64 pa) {
+  acquire(&paref.lock);
+  int n = paref.cnt[PA2INDEX(pa)];
+  release(&paref.lock);
   return n;
 }
 
-int
-pr_incr(uint64 pa) {
-  int i = PA2INDEX(pa);
-  //acquire(&paref[i].lock);
-  int n = ++paref[i].cnt;
-  //release(&paref[i].lock);
-  return n;
+inline void prset(uint64 pa, int n) {
+  acquire(&paref.lock);
+  paref.cnt[PA2INDEX(pa)] = n;
+  release(&paref.lock);
 }
 
-int
-pr_decr(uint64 pa) {
-  int i = PA2INDEX(pa);
-  //acquire(&paref[i].lock);
-  int n = --paref[i].cnt;
-  //release(&paref[i].lock);
+inline void princr(uint64 pa) {
+  acquire(&paref.lock);
+  paref.cnt[PA2INDEX(pa)]++;
+  release(&paref.lock);
+}
+
+inline int prdecr(uint64 pa) {
+  acquire(&paref.lock);
+  int n = --paref.cnt[PA2INDEX(pa)];
+  release(&paref.lock);
   return n;
 }

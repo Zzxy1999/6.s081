@@ -16,6 +16,7 @@ void kernelvec();
 
 extern int devintr();
 
+
 void
 trapinit(void)
 {
@@ -65,10 +66,9 @@ usertrap(void)
       exit(-1);
     }
     uint64 pa = PTE2PA(*pte);
-    int cnt = pr_get(pa);
-    if (cnt) {
+    if (prget(pa) == 1) {
       *pte = (*pte & (~PTE_C)) | PTE_W;
-    } else if (cnt > 1) {
+    } else if (prget(pa) > 1) {
       uint perm = (PTE_FLAGS(*pte) & (~PTE_C)) | PTE_W;
       char *mem;
       if ((mem = kalloc()) == 0) {
@@ -82,6 +82,7 @@ usertrap(void)
       }
     } else {
       exit(-1);
+      panic("paref cnt < 0");
     }
 
   } else if(r_scause() == 8){
