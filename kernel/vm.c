@@ -424,7 +424,6 @@ int cowcheck(pagetable_t pagetable, uint64 vm) {
       return -1;
     }
   } else {
-    return -1;
     panic("paref cnt < 0");
   }
   return 0;

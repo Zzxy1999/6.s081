@@ -68,7 +68,7 @@ usertrap(void)
     uint64 pa = PTE2PA(*pte);
     if (prget(pa) == 1) {
       *pte = (*pte & (~PTE_C)) | PTE_W;
-    } else if (prget(pa) > 1) {
+    } else if (prget(pa) >= 1) {
       uint perm = (PTE_FLAGS(*pte) & (~PTE_C)) | PTE_W;
       char *mem;
       if ((mem = kalloc()) == 0) {
@@ -81,7 +81,6 @@ usertrap(void)
         exit(-1);
       }
     } else {
-      exit(-1);
       panic("paref cnt < 0");
     }
 

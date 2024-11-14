@@ -120,6 +120,7 @@ inline void princr(uint64 pa) {
   release(&paref.lock);
 }
 
+// must atomic
 inline int prdecr(uint64 pa) {
   acquire(&paref.lock);
   int n = --paref.cnt[PA2INDEX(pa)];
