@@ -46,16 +46,21 @@ barrier()
   // Block until all threads have called barrier() and
   // then increment bstate.round.
   //
-
   lock();
-  if (++bstate.nthread % nthread == 0) {
-    printf("%d\n", bstate.round);
+  // plus sync
+  ++bstate.nthread;
+  if (bstate.nthread == nthread) {
     ++bstate.round;
     cast();
   } else {
-    while (bstate.nthread % nthread != 0) {
-      cwait();
-    }
+    cwait();
+  }
+  // minus sync
+  --bstate.nthread;
+  if (bstate.nthread == 0) {
+    cast();
+  } else {
+    cwait();
   }
   unlock();
 }
