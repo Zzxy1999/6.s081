@@ -113,12 +113,10 @@ e1000_transmit(struct mbuf *m)
     mbuffree(pre_m);
   }
 
-  struct mbuf *cur_m = mbufalloc(MBUF_DEFAULT_HEADROOM);
-  memmove(cur_m->buf, m->buf, m->len);
-  cur_m->len = m->len;
-  cur_m->head = cur_m->buf;
-  tx_mbufs[tdt] = cur_m;
+  tx_mbufs[tdt] = m;
 
+  tx_ring[tdt].addr = (uint64)m->buf;
+  tx_ring[tdt].length = m->len;
   tx_ring[tdt].status = E1000_TXD_STAT_DD;
   tx_ring[tdt].cmd = E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
 
