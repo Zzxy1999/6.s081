@@ -102,8 +102,7 @@ e1000_transmit(struct mbuf *m)
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
   //
-  //acquire(&e1000_lock);
-
+  acquire(&e1000_lock);
   uint32 tdt = regs[E1000_TDT];
   if (!(tx_ring[tdt].status & E1000_TXD_STAT_DD)) {
     printf("E1000_TXD_STAT_DD not set\n");
@@ -111,24 +110,20 @@ e1000_transmit(struct mbuf *m)
     return -1;
   }
 
-  struct mbuf *pre_m = tx_mbufs[tdt];
-  if (pre_m) {
-    mbuffree(pre_m);
+  if (tx_mbufs[tdt]) {
+    mbuffree(tx_mbufs[tdt]);
+    tx_mbufs[tdt] = 0;
   }
 
   tx_mbufs[tdt] = m;
 
-  char *p = m->buf;
-  while(p - m->buf < MBUF_SIZE && *p == '\0') {
-    ++p;
-  }
-  tx_ring[tdt].addr = (uint64)p;
+  tx_ring[tdt].addr = (uint64)m->head;
   tx_ring[tdt].length = m->len;
-  tx_ring[tdt].status = E1000_TXD_STAT_DD;
+  tx_ring[tdt].status = 0;
   tx_ring[tdt].cmd = E1000_TXD_CMD_RS | E1000_TXD_CMD_EOP;
 
-  regs[E1000_TDT] = (regs[E1000_TDT] + 1) % TX_RING_SIZE;
-  //release(&e1000_lock);
+  regs[E1000_TDT] = (tdt + 1) % TX_RING_SIZE;
+  release(&e1000_lock);
   return 0;
 }
 
@@ -141,26 +136,22 @@ e1000_recv(void)
   // Check for packets that have arrived from the e1000
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
-  //acquire(&e1000_lock);
-  regs[E1000_RDT] = (regs[E1000_RDT] + 1) % RX_RING_SIZE;
-  uint32 rdt = regs[E1000_RDT];
-  if (!(rx_ring[rdt].status & E1000_RXD_STAT_DD)) {
-    printf("recv rx_ring already done\n");
-    release(&e1000_lock);
-    return;
+  while (1) {
+    uint32 rdt = regs[E1000_RDT] + 1;
+    if (!(rx_ring[rdt].status & E1000_RXD_STAT_DD)) {
+      return;
+    }
+
+    struct mbuf *m = rx_mbufs[rdt];
+    m->len = rx_ring[rdt].length;
+    net_rx(m);
+
+    rx_mbufs[rdt] = mbufalloc(0);
+    rx_ring[rdt].addr = (uint64)rx_mbufs[rdt]->head;
+    rx_ring[rdt].status = 0;
+
+    regs[E1000_RDT] = rdt;
   }
-
-  struct mbuf *m = rx_mbufs[rdt];
-  m->len = rx_ring[rdt].length;
-
-  rx_mbufs[rdt] = mbufalloc(0);
-  rx_ring[rdt].addr = (uint64)rx_mbufs[rdt]->head;
-  rx_ring[rdt].status = 0;
-
-  //release(&e1000_lock);
-  net_rx(m);
-
-  return;
 }
 
 void
