@@ -119,6 +119,58 @@ sys_fstat(void)
   return filestat(f, st);
 }
 
+uint64
+sys_symlink(void)
+{
+  char name[DIRSIZ], old[DIRSIZ], new[DIRSIZ];
+  if (argstr(0, old, MAXPATH) < 0 || argstr(1, new, MAXPATH) < 0) {
+    return -1;
+  }
+
+  begin_op();
+
+  struct inode* dp = nameiparent(new, name);
+  if (dp == 0) {
+    end_op();
+    return -1;
+  }
+  ilock(dp);
+
+  struct inode* ip = ialloc(dp->dev, T_SYMLINK);
+  if (ip == 0) {
+    iunlockput(dp);
+    end_op();
+    return -1;
+  }
+  ilock(ip);
+
+  if (dirlink(dp, new, ip->inum) < 0) {
+    ip->nlink = 0;
+    iupdate(ip);
+    iunlockput(ip);
+    iunlockput(dp);
+    end_op();
+    return -1;
+  }
+
+  if (writei(ip, 0, (uint64)new, 0, DIRSIZ) < 0) {
+    ip->nlink = 0;
+    iupdate(ip);
+    iunlockput(ip);
+    iunlockput(dp);
+    end_op();
+    return -1;
+  }
+
+  iunlockput(dp);
+  iunlockput(ip);
+
+  end_op();
+
+  return 0;
+
+}
+
 // Create the path new as a link to the same inode as old.
 uint64
 sys_link(void)
@@ -328,6 +380,22 @@ sys_open(void)
       return -1;
     }
     ilock(ip);
+    
+    if (!(omode & O_NOFOLLOW)) {
+      while (ip->type == T_SYMLINK) {
+        char name[MAXPATH];
+        readi(ip, 0, (uint64)name, 0, MAXPATH);
+        struct inode* tmp = namei(name);
+        if (tmp == 0) {
+          iunlock(ip);
+          end_op();
+          return -1;
+        }
+        iunlock(ip);
+        ip = tmp;
+      }
+    }
+
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();

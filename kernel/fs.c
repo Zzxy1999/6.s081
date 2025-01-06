@@ -430,7 +430,7 @@ bmap(struct inode *ip, uint bn)
 
     struct buf* bp1 = bread(ip->dev, addr);
     uint* data1 = (uint*)bp1->data;
-    uint index1 = bn / NDIRECT;
+    uint index1 = bn / NINDIRECT;
     uint addr1 = data1[index1];
     if (addr1 == 0) {
       addr1 = balloc(ip->dev);
@@ -444,7 +444,7 @@ bmap(struct inode *ip, uint bn)
 
     struct buf* bp2 = bread(ip->dev, addr1);
     uint* data2 = (uint*)bp2->data;
-    uint index2 = bn % NDIRECT;
+    uint index2 = bn % NINDIRECT;
     uint addr2 = data2[index2];
     if (addr2 == 0) {
       addr2 = balloc(ip->dev);
