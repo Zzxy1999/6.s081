@@ -122,7 +122,7 @@ sys_fstat(void)
 uint64
 sys_symlink(void)
 {
-  char name[DIRSIZ], old[DIRSIZ], new[DIRSIZ];
+  char name[DIRSIZ], old[MAXPATH], new[MAXPATH];
   if (argstr(0, old, MAXPATH) < 0 || argstr(1, new, MAXPATH) < 0) {
     return -1;
   }
@@ -144,7 +144,7 @@ sys_symlink(void)
   }
   ilock(ip);
 
-  if (dirlink(dp, new, ip->inum) < 0) {
+  if (dirlink(dp, name, ip->inum) < 0) {
     ip->nlink = 0;
     iupdate(ip);
     iunlockput(ip);
