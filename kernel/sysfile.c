@@ -361,18 +361,20 @@ sys_open(void)
       return -1;
     }
     ilock(ip);
-    
+
     if (!(omode & O_NOFOLLOW)) {
+      // avoid symlink ring
+      
       while (ip->type == T_SYMLINK) {
         char name[MAXPATH];
         readi(ip, 0, (uint64)name, 0, MAXPATH);
         struct inode* tmp = namei(name);
-        if (tmp == 0) {
-          iunlock(ip);
+        if (tmp == 0 || !strncmp(name, path, MAXPATH)) {
+          iunlockput(ip);
           end_op();
           return -1;
         }
-        iunlock(ip);
+        iunlockput(ip);
         ip = tmp;
         ilock(ip);
       }
