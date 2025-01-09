@@ -12,6 +12,7 @@
 #include "file.h"
 #include "stat.h"
 #include "proc.h"
+#include "fcntl.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -180,3 +181,16 @@ filewrite(struct file *f, uint64 addr, int n)
   return ret;
 }
 
+void setoff(struct file* f, uint off) {
+  f->off = off;
+}
+
+int checkrw(struct file* f, int prot, int flags) {
+  if (f->readable == 0 && (prot & PROT_READ)) {
+    return 0;
+  }
+  if (f->writable == 0 && (prot & PROT_WRITE) && (flags & MAP_SHARED)) {
+    return 0;
+  }
+  return 1;
+}

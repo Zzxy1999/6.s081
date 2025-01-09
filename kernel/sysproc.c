@@ -119,5 +119,9 @@ sys_mmap(void) {
 
 uint64
 sys_munmap(void) {
-  return 0;
+  uint64 addr, length;
+  argaddr(0, &addr);
+  argaddr(1, &length);
+
+  return munmap(PGROUNDDOWN(addr), PGROUNDUP(length));
 }

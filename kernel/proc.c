@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -282,6 +283,56 @@ growproc(int n)
   return 0;
 }
 
+void badcopymmap(struct proc* np) {
+  for (int i = 0; i < NMMAP; ++i) {
+    if (np->mr[i].valid == 1) {
+      for (uint64 addr = np->mr[i].begin; addr < np->mr[i].end; addr += PGSIZE) {
+        pte_t* pte = walk(np->pagetable, addr, 0);
+        if (pte && (*pte & PTE_V)) {
+          if (*pte & PTE_M) {
+            uvmunmap(np->pagetable, addr, 1, 0);
+          } else {
+            uvmunmap(np->pagetable, addr, 1, 1);
+          }
+        }
+      }
+    }
+  }
+}
+
+int copymmap(struct proc* p, struct proc* np) {
+  memset(np->vm, 0, sizeof(p->vm));
+  memset(np->mr, 0, sizeof(p->mr));
+  for (int i = 0; i < NMMAP; ++i) {
+    np->mr[i] = p->mr[i];
+    if (p->mr[i].valid == 1) {
+      for (uint64 addr = np->mr[i].begin; addr < np->mr[i].end; addr += PGSIZE) {
+        np->vm[MMAP_IDX(addr)] = 1;
+        pte_t* pte = walk(p->pagetable, addr, 0);
+        if (!(*pte & PTE_M)) {
+          uint64 mem = (uint64)kalloc();
+          if (mem == 0) {
+            badcopymmap(np);
+            return -1;
+          }
+          memmove((void*)mem, (void*)PTE2PA(*pte), PGSIZE);
+          if (mappages(np->pagetable, addr, PGSIZE, mem, PTE_FLAGS(*pte)) != 0) {
+            kfree((void*)mem);
+            badcopymmap(np);
+            return -1;
+          }
+        } else {
+          if (mappages(np->pagetable, addr, PGSIZE, addr - np->mr[i].begin, PTE_FLAGS(*pte)) != 0) {
+            badcopymmap(np);
+            return -1;
+          }
+        }
+      }
+    }
+  }
+  return 0;
+}
+
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
 int
@@ -296,10 +347,10 @@ fork(void)
     return -1;
   }
 
-  // cpoy mmap info
-  for (int i = 0; i < NMMAP; i++) {
-    np->vm[i] = p->vm[i];
-    np->mr[i] = p->mr[i];
+  if (copymmap(p, np) < 0) {
+    freeproc(np);
+    release(&np->lock);
+    return -1;
   }
 
   // Copy user memory from parent to child.
@@ -321,6 +372,12 @@ fork(void)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
+
+  for(i = 0; i < NMMAP; i++) {
+    if (np->mr[i].valid == 1) {
+      filedup(np->mr[i].f);
+    }
+  }
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
@@ -364,6 +421,12 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  for (int i = 0; i < NMMAP; ++i) {
+    if (p->mr[i].valid == 1) {
+      munmap(p->mr[i].begin, p->mr[i].end - p->mr[i].begin);
+    }
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
@@ -740,8 +803,12 @@ uint64 mmap(uint64 length, int prot, int flags, int fd) {
     return -1;
   }
 
+  if (!checkrw(f, prot, flags)) {
+    return -1;
+  }
+
   // map to 0 with PTE_V | PTE_M
-  if (mappages(p->pagetable, begin, length / PGSIZE, 0, PTE_V | PTE_M) < 0) {
+  if (mappages(p->pagetable, begin, length, 0, PTE_V | PTE_M) < 0) {
     printf("mmap: mappages failed \n");
     return -1;
   }
@@ -770,4 +837,45 @@ int mmap_mr_idx(uint64 vm) {
     ++idx;
   }
   return -1;
+}
+
+int munmap(uint64 addr, uint64 length) {
+  int idx = mmap_mr_idx(addr);
+  if (idx < 0) {
+    return -1;
+  }
+
+  struct proc* p = myproc();
+  // no hole
+  if (addr != p->mr[idx].begin && addr + length != p->mr[idx].end) {
+    panic("munmap: hole");
+  }
+  
+  if (p->mr[idx].flags & MAP_SHARED) {
+    setoff(p->mr[idx].f, addr - p->mr[idx].begin);
+    filewrite(p->mr[idx].f, addr, length);
+  }
+  
+  for (uint64 vm = addr; vm < addr + length; vm += PGSIZE) {
+    pte_t* pte = walk(p->pagetable, vm, 0);
+    if (*pte & PTE_M) {
+      uvmunmap(p->pagetable, vm, 1, 0);
+    } else {
+      uvmunmap(p->pagetable, vm, 1, 1);
+    }
+  }
+
+  if (addr == p->mr[idx].begin) {
+    while (p->mr[idx].begin < addr + length && p->mr[idx].begin < p->mr[idx].end) {
+      p->vm[MMAP_IDX(p->mr[idx].begin)] = 0;
+      p->mr[idx].begin += PGSIZE;
+    }
+  }
+  
+  if (p->mr[idx].begin == p->mr[idx].end) {
+    fileclose(p->mr[idx].f);
+    p->mr[idx].valid = 0;
+  }
+
+  return 0;
 }

@@ -103,6 +103,8 @@ usertrap(void)
         goto bad;
       }
 
+      setoff(p->mr[idx].f, (vm - p->mr[idx].begin) / PGSIZE * PGSIZE);
+
       fileread(p->mr[idx].f, vm, PGSIZE);
 
     } else {
