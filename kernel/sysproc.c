@@ -91,3 +91,33 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_mmap(void) {
+  uint64 addr, length, offset;
+  int prot, flags, fd;
+  argaddr(0, &addr);
+  argaddr(1, &length);
+  argint(2, &prot);
+  argint(3, &flags);
+  argint(4, &fd);
+  argaddr(5, &offset);
+  if (addr != 0) {
+    panic("mmap: addr!");
+  }
+  if (offset != 0) {
+    panic("mmap: offset");
+  }
+  length = PGROUNDUP(length);
+  if (length / PGSIZE > NMMAP) {
+    panic("mmap: length");
+  }
+
+  return mmap(length, prot, flags, fd);
+
+}
+
+uint64
+sys_munmap(void) {
+  return 0;
+}

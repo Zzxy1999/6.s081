@@ -55,6 +55,8 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+      memset(p->vm, 0, sizeof(p->vm));
+      memset(p->mr, 0, sizeof(p->mr));
   }
 }
 
@@ -237,6 +239,12 @@ userinit(void)
   p = allocproc();
   initproc = p;
   
+  //mmap
+  for (int i = 0; i < NMMAP; i++) {
+    p->vm[i] = 0;
+    p->mr->valid = 0;
+  }
+
   // allocate one user page and copy initcode's instructions
   // and data into it.
   uvmfirst(p->pagetable, initcode, sizeof(initcode));
@@ -286,6 +294,12 @@ fork(void)
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
+  }
+
+  // cpoy mmap info
+  for (int i = 0; i < NMMAP; i++) {
+    np->vm[i] = p->vm[i];
+    np->mr[i] = p->mr[i];
   }
 
   // Copy user memory from parent to child.
@@ -680,4 +694,80 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+uint64 mmap(uint64 length, int prot, int flags, int fd) {
+  struct proc* p = myproc();
+
+  uint64 begin, end;
+  begin = MMAP_BEGIN;
+  while (begin < MMAP_END) {
+    end = begin;
+    while (end - begin < length && end < MMAP_END && p->vm[MMAP_IDX(end)] == 0) {
+      end += PGSIZE;
+    }
+    if (end - begin == length) {
+      break;
+    }
+    begin = end + PGSIZE;  
+  }
+
+  if (end - begin != length) {
+    printf("mmap: no enough vm\n");
+    return -1;
+  }
+
+  int idx = 0;
+  while (idx < NMMAP) {
+    if (p->mr[idx].valid == 0) {
+      break;
+    }
+    ++idx;
+  }
+  if (idx == NMMAP) {
+    printf("mmap: no enough rm\n");
+    return -1;
+  }
+
+  if (fd < 0 || fd >= NOFILE) {
+    printf("mmap: fd %d invalid\n", fd);
+    return -1;
+  }
+
+  struct file* f = p->ofile[fd];
+  if (!f) {
+    printf("mmap: fd %d invalid\n", fd);
+    return -1;
+  }
+
+  // map to 0 with PTE_V | PTE_M
+  if (mappages(p->pagetable, begin, length / PGSIZE, 0, PTE_V | PTE_M) < 0) {
+    printf("mmap: mappages failed \n");
+    return -1;
+  }
+
+  // all success
+  for (int i = MMAP_IDX(begin); i < MMAP_IDX(end); ++i) {
+    p->vm[i] = 1;
+  }
+  p->mr[idx].valid = 1;
+  p->mr[idx].begin = begin;
+  p->mr[idx].end = end;
+  p->mr[idx].f = f;
+  p->mr[idx].flags = flags;
+  p->mr[idx].prot = prot;
+  filedup(f);
+  return begin;
+}
+
+int mmap_mr_idx(uint64 vm) {
+  struct proc* p = myproc();
+  int idx = 0;
+  while (idx < NMMAP) {
+    if (p->mr[idx].valid == 1 && p->mr[idx].begin <= vm && vm < p->mr[idx].end && p->vm[MMAP_IDX(vm)] == 1) {
+      return idx;
+    }
+    ++idx;
+  }
+  return -1;
 }

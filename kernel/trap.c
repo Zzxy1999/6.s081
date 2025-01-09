@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -67,7 +68,50 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (r_scause() == 13 || r_scause() == 15) {
+    uint64 vm = r_stval();
+    struct proc* p = myproc();
+
+    int idx = mmap_mr_idx(vm);
+    if (idx < 0) {
+      printf("vm check failed\n");
+      goto bad;
+    }
+
+    pte_t* pte = walk(p->pagetable, vm, 0);
+    if ((*pte & PTE_V) && (*pte & PTE_M)) {
+      void* mem = kalloc();
+      if (mem == 0) {
+        printf("kalloc failed\n");
+        goto bad;
+      }
+      memset(mem, 0, PGSIZE);
+
+      int mode = PTE_V | PTE_U;
+      if (p->mr[idx].prot & PROT_READ) {
+        mode |= PTE_R;
+      }
+      if (p->mr[idx].prot & PROT_WRITE) {
+        mode |= PTE_W;
+      }
+
+      uvmunmap(p->pagetable, vm, 1, 0);
+
+      if (mappages(p->pagetable, vm, PGSIZE, (uint64)mem, mode) < 0) {
+        kfree(mem);
+        printf("mappages failed\n");
+        goto bad;
+      }
+
+      fileread(p->mr[idx].f, vm, PGSIZE);
+
+    } else {
+      printf("pte check failed\n");
+      goto bad;
+    }
+
   } else {
+bad:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);

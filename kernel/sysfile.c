@@ -503,14 +503,3 @@ sys_pipe(void)
   }
   return 0;
 }
-
-uint64
-sys_mmap(void) {
-  
-  return 0;
-}
-
-uint64
-sys_munmap(void) {
-  return 0;
-}

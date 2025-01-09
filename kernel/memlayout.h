@@ -65,3 +65,11 @@
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
+
+// mmap area begin
+#define MMAP_BEGIN (TRAPFRAME - NMMAP * PGSIZE)
+#define MMAP_END TRAPFRAME
+// vm -> page idx in mmap area
+#define MMAP_IDX(vm) ((PGROUNDDOWN(vm) - MMAP_BEGIN) / PGSIZE)
+// idx -> vm(roundown)
+#define MMAP_VM(idx) (MMAP_BEGIN + idx * PGSIZE)
