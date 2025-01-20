@@ -1,6 +1,9 @@
 // Format of an ELF executable file
 
 #define ELF_MAGIC 0x464C457FU  // "\x7FELF" in little endian
+#define MAX_TABLE_SIZE 4096
+#define MAX_SECTION_SIZE 4096
+#define MAX_LARGE_MEM 10
 
 // File header
 struct elfhdr {
@@ -31,6 +34,28 @@ struct proghdr {
   uint64 filesz;
   uint64 memsz;
   uint64 align;
+};
+
+typedef struct {
+  uint name;
+  uint type;
+  uint64 flags;
+  uint64 addr;
+  uint64 off;
+  uint64 size;
+  uint link;
+  uint info;
+  uint64 addralign;
+  uint64 entsize;
+} shdr;
+
+
+
+
+
+struct largemem_t {
+  char *mem[MAX_LARGE_MEM];
+  int cnt;
 };
 
 // Values for Proghdr type

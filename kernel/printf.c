@@ -149,3 +149,15 @@ backtrace()
     }
   }
 }
+
+void nprintf(char *buf, uint64 size) {
+  uint64 cnt = 0;
+  char *p = buf;
+  while (cnt < size) {
+    printf("%s\n", p);
+    uint64 len = strlen(p); 
+    cnt += len + 1;
+    p += len + 1;
+  }
+  printf("\n");
+}

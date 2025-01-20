@@ -503,3 +503,19 @@ sys_pipe(void)
   }
   return 0;
 }
+
+// analyse elf
+uint64
+sys_elf(void)
+{
+  char path[MAXPATH];
+  char section[MAXPATH];
+  if (argstr(0, path, sizeof(path)) < 0) {
+    return -1;
+  }
+  if (argstr(1, section, sizeof(section)) < 0) {
+    return -1;
+  }
+  analyse_elf(path, section);
+  return 0;
+}

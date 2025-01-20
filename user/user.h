@@ -24,6 +24,7 @@ int sleep(int);
 int uptime(void);
 int sigalarm(int ticks, void(*handler)());
 int sigreturn(void);
+int elf(const char*, const char*);
 
 // ulib.c
 int stat(const char*, struct stat*);
